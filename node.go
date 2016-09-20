@@ -19,7 +19,7 @@ import (
 //Node ...
 type Node struct {
 	electTimer *time.Timer
-	handler    ChanHandler
+	handler    *ChanHandler
 	id         string
 	ip         string
 	leader     string
@@ -332,7 +332,7 @@ func (n *Node) waitOnLoopFinish() {
 }
 
 func (n *Node) wonElection(votes int) bool {
-	return votes >= quorumNeeded(len(n.peers))
+	return votes >= quorumNeeded(len(n.peers)+1)
 }
 
 func genID(ip string) string {
@@ -343,11 +343,12 @@ func genID(ip string) string {
 }
 
 //NewNode ....
-func NewNode(peers []string, ip, logPath string, port int) (*Node, error) {
+func NewNode(handler *ChanHandler, peers []string, ip, logPath string, port int) (*Node, error) {
 	n := &Node{
-		ip:    ip,
-		state: FOLLOWER,
-		peers: peers,
+		ip:      ip,
+		state:   FOLLOWER,
+		peers:   peers,
+		handler: handler,
 	}
 	n.id = genID(ip)
 	n.electTimer = time.NewTimer(randElectionTimeout())
