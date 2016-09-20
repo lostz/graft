@@ -1,0 +1,10 @@
+package: github.com/lostz/graft
+import:
+- package: github.com/Sirupsen/logrus
+- package: github.com/golang/protobuf
+  subpackages:
+  - proto
+- package: golang.org/x/net
+  subpackages:
+  - context
+- package: google.golang.org/grpc

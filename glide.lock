@@ -1,0 +1,35 @@
+hash: 170de618e3c8c48bde813784499da6978e5401d4725f3059993c6008093dad1c
+updated: 2016-09-20T17:17:47.882543503+08:00
+imports:
+- name: github.com/golang/protobuf
+  version: 1f49d83d9aa00e6ce4fc8258c71cc7786aec968a
+  subpackages:
+  - proto
+- name: github.com/Sirupsen/logrus
+  version: 3ec0642a7fb6488f65b06f9040adc67e3990296a
+- name: golang.org/x/net
+  version: 71a035914f99bb58fe82eac0f1289f10963d876c
+  subpackages:
+  - context
+  - http2
+  - http2/hpack
+  - idna
+  - internal/timeseries
+  - lex/httplex
+  - trace
+- name: golang.org/x/sys
+  version: 8f0908ab3b2457e2e15403d3697c9ef5cb4b57a9
+  subpackages:
+  - unix
+- name: google.golang.org/grpc
+  version: 71d2ea4f75286a63b606aca2422cd17ff37fd5b8
+  subpackages:
+  - codes
+  - credentials
+  - grpclog
+  - internal
+  - metadata
+  - naming
+  - peer
+  - transport
+testImports: []
