@@ -1,0 +1,29 @@
+syntax = "proto3";
+package protocol;
+
+
+message VoteRequest {
+    uint64 term=1;
+    string candidate=2;
+}
+
+
+message VoteResponse  {
+    uint64 term=1;
+    bool   granted=2;
+}
+
+
+message HeartbeatRequest {
+    uint64 term=1;
+    string leader=2;
+}
+
+message HeartbeatResponse {}
+
+service raft {
+    rpc VoteOn(VoteRequest) returns (VoteResponse){};
+    rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse){};
+}
+
+
