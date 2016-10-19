@@ -37,7 +37,7 @@ type Node struct {
 func (n *Node) broadcastVote() int {
 	votes := 1
 	for _, peer := range n.peers {
-		conn, err := grpc.Dial(peer, grpc.WithTimeout(500*time.Millisecond))
+		conn, err := grpc.Dial(peer, []grpc.DialOption{grpc.WithTimeout(500 * time.Millisecond), grpc.WithInsecure()}...)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"addr": peer,
@@ -65,7 +65,7 @@ func (n *Node) broadcastVote() int {
 func (n *Node) broadcastHearbeat() {
 
 	for _, peer := range n.peers {
-		conn, err := grpc.Dial(peer, grpc.WithTimeout(1000*time.Millisecond))
+		conn, err := grpc.Dial(peer, []grpc.DialOption{grpc.WithTimeout(1000 * time.Millisecond), grpc.WithInsecure()}...)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"addr": peer,
