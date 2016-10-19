@@ -179,6 +179,7 @@ func (n *Node) resetElectionTimeout() {
 func (n *Node) runAsCandidate() {
 	n.setVote(n.id)
 	if err := n.writeState(); err != nil {
+		log.Println(err.Error())
 		n.switchToFollower("")
 		return
 	}
@@ -356,6 +357,7 @@ func NewNode(handler *ChanHandler, peers []string, ip, logPath string, port int)
 	if err != nil {
 		return nil, err
 	}
+	n.logPath = logPath
 	g := grpc.NewServer()
 	protocol.RegisterRaftServer(g, n)
 	n.server = g
