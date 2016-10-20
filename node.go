@@ -57,7 +57,7 @@ func (n *Node) votePeer(peer string) {
 	}
 	defer conn.Close()
 	c := protocol.NewRaftClient(conn)
-	vresp, err := c.VoteOn(context.Background(), &protocol.VoteRequest{Term: n.term, Candidate: n.id})
+	_, err = c.ReceiveVoteRequest(context.Background(), &protocol.VoteRequest{Term: n.term, Candidate: n.id})
 	if err != nil {
 		logger.Error(
 			"Vote on",
@@ -66,8 +66,7 @@ func (n *Node) votePeer(peer string) {
 		)
 		return
 	}
-	n.VoteResponse <- vresp
-
+	return
 }
 
 func (n *Node) broadcastHearbeat() {
@@ -453,40 +452,10 @@ func (n *Node) switchToLeader() {
 	n.switchState(LEADER)
 }
 
-//VoteOn grpc
-func (n *Node) VoteOn(context context.Context, requset *protocol.VoteRequest) (*protocol.VoteResponse, error) {
-	resp := &protocol.VoteResponse{Term: n.term, Granted: false}
-	if requset.Term < n.term {
-		return resp, nil
-	}
-	saveState := false
-	if requset.Term > n.term {
-		n.mu.Lock()
-		n.term = requset.Term
-		n.vote = ""
-		n.leader = ""
-		n.mu.Unlock()
-		saveState = true
-	}
-	if n.State() == LEADER && !saveState {
-		return resp, nil
-	}
-
-	if n.vote != "" && n.vote != requset.Candidate {
-		return resp, nil
-	}
-	n.setVote(requset.Candidate)
-	if saveState {
-		if err := n.writeState(); err != nil {
-			n.setVote("")
-			n.resetElectionTimeout()
-			n.switchToFollower("")
-			return resp, nil
-		}
-	}
-	n.resetElectionTimeout()
-	resp.Granted = true
-	return resp, nil
+//ReceiveVoteRequest grpc
+func (n *Node) ReceiveVoteRequest(context context.Context, vreq *protocol.VoteRequest) (*protocol.Response, error) {
+	n.VoteRequests <- vreq
+	return &protocol.Response{}, nil
 }
 
 func (n *Node) waitOnLoopFinish() {
