@@ -1,5 +1,5 @@
 hash: 170de618e3c8c48bde813784499da6978e5401d4725f3059993c6008093dad1c
-updated: 2016-10-19T16:20:42.852919446+08:00
+updated: 2016-10-20T11:26:41.056183429+08:00
 imports:
 - name: github.com/golang/protobuf
   version: 98fa357170587e470c5f27d3c3ea0947b71eb455
@@ -7,6 +7,10 @@ imports:
   - proto
 - name: github.com/Sirupsen/logrus
   version: 3ec0642a7fb6488f65b06f9040adc67e3990296a
+- name: github.com/uber-go/atomic
+  version: 6c2817a9ef3b9315f7d237a652f2ab0dac2aee96
+- name: github.com/uber-go/zap
+  version: c4939d1166b2220bb45338e21506623b4bbdec50
 - name: golang.org/x/net
   version: a625e3953219464fdd5611bb48bf87c927717295
   subpackages:
@@ -17,10 +21,6 @@ imports:
   - internal/timeseries
   - lex/httplex
   - trace
-- name: golang.org/x/sys
-  version: 002cbb5f952456d0c50e0d2aff17ea5eca716979
-  subpackages:
-  - unix
 - name: google.golang.org/grpc
   version: b7f1379d3cbbbeb2ca3405852012e237aa05459e
   subpackages:
