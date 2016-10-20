@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
-	"strconv"
 	"sync"
 	"time"
 
@@ -368,6 +367,7 @@ func (n *Node) ReceiveVoteResponse(context context.Context, vresp *protocol.Vote
 }
 
 func (n *Node) sendVoteResponse(peer string, vresp *protocol.VoteResponse) {
+	fmt.Println(peer)
 	conn, err := grpc.Dial(peer, []grpc.DialOption{grpc.WithTimeout(500 * time.Millisecond), grpc.WithInsecure()}...)
 	if err != nil {
 		logger.Warn(
@@ -468,13 +468,6 @@ func (n *Node) wonElection(votes int) bool {
 	return votes >= quorumNeeded(len(n.peers)+1)
 }
 
-func genID(ip string) string {
-	IP := net.ParseIP(ip)
-	machineID := uint16(IP[2])<<8 + uint16(IP[3])
-	return strconv.FormatUint(uint64((time.Now().UTC().UnixNano()/sonyflakeTimeUnit)<<(BitLenSequence+BitLenMachineID))|uint64(0)<<BitLenMachineID|uint64(machineID), 10)
-
-}
-
 //NewNode ....
 func NewNode(handler *ChanHandler, peers []string, ip, logPath string, port int) (*Node, error) {
 	n := &Node{
@@ -487,7 +480,7 @@ func NewNode(handler *ChanHandler, peers []string, ip, logPath string, port int)
 	n.HeartBeats = make(chan *protocol.HeartbeatRequest)
 	n.VoteRequests = make(chan *protocol.VoteRequest)
 	n.VoteResponse = make(chan *protocol.VoteResponse)
-	n.id = genID(ip)
+	n.id = fmt.Sprintf("%s:%d", ip, port)
 	n.electTimer = time.NewTimer(randElectionTimeout())
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
