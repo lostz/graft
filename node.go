@@ -10,80 +10,97 @@ import (
 
 	"golang.org/x/net/context"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/lostz/graft/protocol"
+	"github.com/uber-go/zap"
 
 	"google.golang.org/grpc"
 )
 
+var logger = zap.New(zap.NewTextEncoder())
+
 //Node ...
 type Node struct {
-	electTimer *time.Timer
-	handler    *ChanHandler
-	id         string
-	ip         string
-	leader     string
-	logPath    string
-	mu         sync.Mutex
-	peers      []string
-	quit       chan chan struct{}
-	server     *grpc.Server
-	state      State
-	stateChg   []*StateChange
-	term       uint64
-	vote       string
+	electTimer   *time.Timer
+	handler      *ChanHandler
+	id           string
+	ip           string
+	leader       string
+	logPath      string
+	mu           sync.Mutex
+	peers        []string
+	quit         chan chan struct{}
+	server       *grpc.Server
+	state        State
+	stateChg     []*StateChange
+	term         uint64
+	vote         string
+	VoteRequests chan *protocol.VoteRequest
+	VoteResponse chan *protocol.VoteResponse
+	HeartBeats   chan *protocol.HeartbeatRequest
 }
 
-func (n *Node) broadcastVote() int {
-	votes := 1
+func (n *Node) broadcastVote() {
 	for _, peer := range n.peers {
-		conn, err := grpc.Dial(peer, []grpc.DialOption{grpc.WithTimeout(500 * time.Millisecond), grpc.WithInsecure()}...)
-		if err != nil {
-			log.WithFields(log.Fields{
-				"addr": peer,
-			}).Errorf("grpc dial %+v", err)
-			continue
-		}
-		defer conn.Close()
-		c := protocol.NewRaftClient(conn)
-		vresp, err := c.VoteOn(context.Background(), &protocol.VoteRequest{Term: n.term, Candidate: n.id})
-		if err != nil {
-			log.WithFields(log.Fields{
-				"addr": peer,
-			}).Errorf("voteOn %+v", err)
-			continue
-		}
-		if vresp.Granted && vresp.Term == n.term {
-			votes++
-		}
-
+		go n.votePeer(peer)
 	}
+}
 
-	return votes
+func (n *Node) votePeer(peer string) {
+	conn, err := grpc.Dial(peer, []grpc.DialOption{grpc.WithTimeout(500 * time.Millisecond), grpc.WithInsecure()}...)
+	if err != nil {
+		logger.Warn(
+			"grp dial",
+			zap.String("addr:", peer),
+			zap.String("err", err.Error()),
+		)
+		return
+	}
+	defer conn.Close()
+	c := protocol.NewRaftClient(conn)
+	vresp, err := c.VoteOn(context.Background(), &protocol.VoteRequest{Term: n.term, Candidate: n.id})
+	if err != nil {
+		logger.Error(
+			"Vote on",
+			zap.String("addr", peer),
+			zap.String("err", err.Error()),
+		)
+		return
+	}
+	n.VoteResponse <- vresp
+
 }
 
 func (n *Node) broadcastHearbeat() {
 
 	for _, peer := range n.peers {
-		conn, err := grpc.Dial(peer, []grpc.DialOption{grpc.WithTimeout(1000 * time.Millisecond), grpc.WithInsecure()}...)
-		if err != nil {
-			log.WithFields(log.Fields{
-				"addr": peer,
-			}).Errorf("grpc dial %+v", err)
-			continue
-		}
-		defer conn.Close()
-		c := protocol.NewRaftClient(conn)
-		_, err = c.Heartbeat(context.Background(), &protocol.HeartbeatRequest{Term: n.term, Leader: n.id})
-		if err != nil {
-			log.WithFields(log.Fields{
-				"addr": peer,
-			}).Errorf("heartbeat  %+v", err)
-			continue
-
-		}
+		go n.heartbeatPeer(peer)
 
 	}
+}
+
+func (n *Node) heartbeatPeer(peer string) {
+	conn, err := grpc.Dial(peer, []grpc.DialOption{grpc.WithTimeout(1000 * time.Millisecond), grpc.WithInsecure()}...)
+	if err != nil {
+		logger.Warn(
+			"grp dial",
+			zap.String("addr:", peer),
+			zap.String("err", err.Error()),
+		)
+		return
+	}
+	defer conn.Close()
+	c := protocol.NewRaftClient(conn)
+	_, err = c.Heartbeat(context.Background(), &protocol.HeartbeatRequest{Term: n.term, Leader: n.id})
+	if err != nil {
+		logger.Error(
+			"Vote on",
+			zap.String("addr", peer),
+			zap.String("err", err.Error()),
+		)
+		return
+
+	}
+
 }
 
 func (n *Node) clearTimers() {
@@ -106,9 +123,9 @@ func (n *Node) Close() {
 }
 
 //Heartbeat from leader
-func (n *Node) Heartbeat(context context.Context, requset *protocol.HeartbeatRequest) (*protocol.HeartbeatResponse, error) {
+func (n *Node) Heartbeat(context context.Context, requset *protocol.HeartbeatRequest) (*protocol.Response, error) {
 	if requset.Term < n.term {
-		return &protocol.HeartbeatResponse{}, nil
+		return &protocol.Response{}, nil
 	}
 	saveState := false
 	if n.State() == LEADER {
@@ -122,13 +139,83 @@ func (n *Node) Heartbeat(context context.Context, requset *protocol.HeartbeatReq
 	n.resetElectionTimeout()
 	if saveState {
 		if err := n.writeState(); err != nil {
-			log.WithFields(log.Fields{
-				"term": n.term,
-			}).Errorf("save state %+v", err)
+			logger.Error(
+				"write state",
+				zap.Uint64("term", n.term),
+				zap.String("error", err.Error()),
+			)
 		}
 	}
 	n.switchToFollower(requset.Leader)
-	return &protocol.HeartbeatResponse{}, nil
+	return &protocol.Response{}, nil
+}
+
+func (n *Node) handleHeartBeat(hb *protocol.HeartbeatRequest) bool {
+	if hb.Term < n.term {
+		return false
+	}
+	saveState := false
+	stepDown := false
+	if hb.Term > n.term {
+		n.term = hb.Term
+		n.vote = ""
+		stepDown = true
+		saveState = true
+	}
+	if n.State() == CANDIDATE && hb.Term >= n.term {
+		n.term = hb.Term
+		n.vote = ""
+		stepDown = true
+		saveState = true
+	}
+	n.resetElectionTimeout()
+	if saveState {
+		if err := n.writeState(); err != nil {
+			stepDown = true
+		}
+	}
+	return stepDown
+
+}
+
+func (n *Node) handleVoteRequest(vreq *protocol.VoteRequest) bool {
+	deny := &protocol.VoteResponse{Term: n.term, Granted: false}
+	if vreq.Term < n.term {
+		n.sendVoteResponse(vreq.Candidate, deny)
+		return false
+	}
+	saveState := false
+	stepDown := false
+	if vreq.Term > n.term {
+		n.term = vreq.Term
+		n.vote = ""
+		n.leader = ""
+		stepDown = true
+		saveState = true
+	}
+	if n.State() == LEADER && !stepDown {
+		n.sendVoteResponse(vreq.Candidate, deny)
+		return stepDown
+	}
+	if n.vote != "" && n.vote != vreq.Candidate {
+		n.sendVoteResponse(vreq.Candidate, deny)
+		return stepDown
+	}
+	n.setVote(vreq.Candidate)
+	if saveState {
+		if err := n.writeState(); err != nil {
+			n.setVote("")
+			n.sendVoteResponse(vreq.Candidate, deny)
+			n.resetElectionTimeout()
+			return true
+		}
+
+	}
+	accept := &protocol.VoteResponse{Term: n.term, Granted: true}
+	n.sendVoteResponse(vreq.Candidate, accept)
+	n.resetElectionTimeout()
+	return stepDown
+
 }
 
 func (n *Node) isRunning() bool {
@@ -177,17 +264,17 @@ func (n *Node) resetElectionTimeout() {
 }
 
 func (n *Node) runAsCandidate() {
+	votes := 1
 	n.setVote(n.id)
 	if err := n.writeState(); err != nil {
-		log.Println(err.Error())
 		n.switchToFollower("")
 		return
 	}
-	votes := n.broadcastVote()
 	if n.wonElection(votes) {
 		n.switchToLeader()
 		return
 	}
+	n.broadcastVote()
 	for {
 		select {
 		case q := <-n.quit:
@@ -196,6 +283,25 @@ func (n *Node) runAsCandidate() {
 		case <-n.electTimer.C:
 			n.switchToCandidate()
 			return
+		case vresp := <-n.VoteResponse:
+			if vresp.Granted && vresp.Term == n.term {
+				votes++
+				if n.wonElection(votes) {
+					n.switchToLeader()
+					return
+				}
+
+			}
+		case vreq := <-n.VoteRequests:
+			if stepDown := n.handleVoteRequest(vreq); stepDown {
+				n.switchToFollower("")
+				return
+			}
+		case hb := <-n.HeartBeats:
+			if stepDown := n.handleHeartBeat(hb); stepDown {
+				n.switchToFollower(hb.Leader)
+				return
+			}
 
 		}
 	}
@@ -211,6 +317,18 @@ func (n *Node) runAsFollower() {
 		case <-n.electTimer.C:
 			n.switchToCandidate()
 			return
+		case vreq := <-n.VoteRequests:
+			if shouldReturn := n.handleVoteRequest(vreq); shouldReturn {
+				return
+			}
+		case hb := <-n.HeartBeats:
+			if n.leader == "" {
+				n.setLeader(hb.Leader)
+			}
+			if stepDown := n.handleHeartBeat(hb); stepDown {
+				n.setLeader(hb.Leader)
+			}
+
 		}
 
 	}
@@ -227,8 +345,47 @@ func (n *Node) runAsLeader() {
 			return
 		case <-hb.C:
 			n.broadcastHearbeat()
+		case vreq := <-n.VoteRequests:
+			if stepDown := n.handleVoteRequest(vreq); stepDown {
+				n.switchToFollower("")
+				return
+			}
+		case hb := <-n.HeartBeats:
+			if stepDown := n.handleHeartBeat(hb); stepDown {
+				n.switchToFollower(hb.Leader)
+				return
+			}
 
 		}
+
+	}
+
+}
+
+// ReceiveVoteResponse recevie voteresponse
+func (n *Node) ReceiveVoteResponse(context context.Context, vresp *protocol.VoteResponse) (*protocol.Response, error) {
+	n.VoteResponse <- vresp
+	return &protocol.Response{}, nil
+}
+
+func (n *Node) sendVoteResponse(peer string, vresp *protocol.VoteResponse) {
+	conn, err := grpc.Dial(peer, []grpc.DialOption{grpc.WithTimeout(500 * time.Millisecond), grpc.WithInsecure()}...)
+	if err != nil {
+		logger.Warn(
+			"grpc dial",
+			zap.String("peer", peer),
+			zap.String("error", err.Error()),
+		)
+		return
+	}
+	defer conn.Close()
+	c := protocol.NewRaftClient(conn)
+	_, err = c.ReceiveVoteResponse(context.Background(), vresp)
+	if err != nil {
+		logger.Error(
+			"send vote response",
+			zap.String("error", err.Error()),
+		)
 
 	}
 
@@ -243,6 +400,12 @@ func (n *Node) setVote(candidate string) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	n.vote = candidate
+}
+
+func (n *Node) setLeader(leader string) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.leader = leader
 }
 
 //State node current state
@@ -351,6 +514,10 @@ func NewNode(handler *ChanHandler, peers []string, ip, logPath string, port int)
 		peers:   peers,
 		handler: handler,
 	}
+	n.quit = make(chan chan struct{})
+	n.HeartBeats = make(chan *protocol.HeartbeatRequest)
+	n.VoteRequests = make(chan *protocol.VoteRequest)
+	n.VoteResponse = make(chan *protocol.VoteResponse)
 	n.id = genID(ip)
 	n.electTimer = time.NewTimer(randElectionTimeout())
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))

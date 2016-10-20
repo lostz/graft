@@ -19,11 +19,13 @@ message HeartbeatRequest {
     string leader=2;
 }
 
-message HeartbeatResponse {}
+
+message Response{}
 
 service raft {
     rpc VoteOn(VoteRequest) returns (VoteResponse){};
-    rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse){};
+    rpc ReceiveVoteResponse(VoteResponse) returns(Response){};
+    rpc Heartbeat(HeartbeatRequest) returns (Response){};
 }
 
 
