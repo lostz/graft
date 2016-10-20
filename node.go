@@ -47,11 +47,6 @@ func (n *Node) broadcastVote() {
 func (n *Node) votePeer(peer string) {
 	conn, err := grpc.Dial(peer, []grpc.DialOption{grpc.WithTimeout(500 * time.Millisecond), grpc.WithInsecure()}...)
 	if err != nil {
-		logger.Warn(
-			"grp dial",
-			zap.String("addr:", peer),
-			zap.String("err", err.Error()),
-		)
 		return
 	}
 	defer conn.Close()
@@ -79,11 +74,6 @@ func (n *Node) broadcastHearbeat() {
 func (n *Node) heartbeatPeer(peer string) {
 	conn, err := grpc.Dial(peer, []grpc.DialOption{grpc.WithTimeout(1000 * time.Millisecond), grpc.WithInsecure()}...)
 	if err != nil {
-		logger.Warn(
-			"grp dial",
-			zap.String("addr:", peer),
-			zap.String("err", err.Error()),
-		)
 		return
 	}
 	defer conn.Close()
@@ -282,6 +272,7 @@ func (n *Node) runAsCandidate() {
 			n.switchToCandidate()
 			return
 		case vresp := <-n.VoteResponse:
+			fmt.Println(vresp)
 			if vresp.Granted && vresp.Term == n.term {
 				votes++
 				if n.wonElection(votes) {
@@ -291,11 +282,13 @@ func (n *Node) runAsCandidate() {
 
 			}
 		case vreq := <-n.VoteRequests:
+			fmt.Println(vreq)
 			if stepDown := n.handleVoteRequest(vreq); stepDown {
 				n.switchToFollower("")
 				return
 			}
 		case hb := <-n.HeartBeats:
+			fmt.Println(hb)
 			if stepDown := n.handleHeartBeat(hb); stepDown {
 				n.switchToFollower(hb.Leader)
 				return
@@ -367,14 +360,8 @@ func (n *Node) ReceiveVoteResponse(context context.Context, vresp *protocol.Vote
 }
 
 func (n *Node) sendVoteResponse(peer string, vresp *protocol.VoteResponse) {
-	fmt.Println(peer)
 	conn, err := grpc.Dial(peer, []grpc.DialOption{grpc.WithTimeout(500 * time.Millisecond), grpc.WithInsecure()}...)
 	if err != nil {
-		logger.Warn(
-			"grpc dial",
-			zap.String("peer", peer),
-			zap.String("error", err.Error()),
-		)
 		return
 	}
 	defer conn.Close()
