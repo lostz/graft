@@ -47,19 +47,16 @@ func (n *Node) broadcastVote() {
 func (n *Node) votePeer(peer string) {
 	conn, err := grpc.Dial(peer, []grpc.DialOption{grpc.WithTimeout(500 * time.Millisecond), grpc.WithInsecure()}...)
 	if err != nil {
-		return
-	}
-	defer conn.Close()
-	c := protocol.NewRaftClient(conn)
-	_, err = c.ReceiveVoteRequest(context.Background(), &protocol.VoteRequest{Term: n.term, Candidate: n.id})
-	if err != nil {
 		logger.Error(
-			"Vote on",
+			"grpc dial",
 			zap.String("addr", peer),
 			zap.String("err", err.Error()),
 		)
 		return
 	}
+	defer conn.Close()
+	c := protocol.NewRaftClient(conn)
+	c.ReceiveVoteRequest(context.Background(), &protocol.VoteRequest{Term: n.term, Candidate: n.id})
 	return
 }
 
@@ -74,20 +71,16 @@ func (n *Node) broadcastHearbeat() {
 func (n *Node) heartbeatPeer(peer string) {
 	conn, err := grpc.Dial(peer, []grpc.DialOption{grpc.WithTimeout(1000 * time.Millisecond), grpc.WithInsecure()}...)
 	if err != nil {
-		return
-	}
-	defer conn.Close()
-	c := protocol.NewRaftClient(conn)
-	_, err = c.Heartbeat(context.Background(), &protocol.HeartbeatRequest{Term: n.term, Leader: n.id})
-	if err != nil {
 		logger.Error(
-			"Vote on",
+			"grpc dial",
 			zap.String("addr", peer),
 			zap.String("err", err.Error()),
 		)
 		return
-
 	}
+	defer conn.Close()
+	c := protocol.NewRaftClient(conn)
+	c.Heartbeat(context.Background(), &protocol.HeartbeatRequest{Term: n.term, Leader: n.id})
 
 }
 
@@ -362,18 +355,17 @@ func (n *Node) ReceiveVoteResponse(context context.Context, vresp *protocol.Vote
 func (n *Node) sendVoteResponse(peer string, vresp *protocol.VoteResponse) {
 	conn, err := grpc.Dial(peer, []grpc.DialOption{grpc.WithTimeout(500 * time.Millisecond), grpc.WithInsecure()}...)
 	if err != nil {
+		logger.Error(
+			"grpc dial",
+			zap.String("addr", peer),
+			zap.String("err", err.Error()),
+		)
 		return
 	}
 	defer conn.Close()
 	c := protocol.NewRaftClient(conn)
-	_, err = c.ReceiveVoteResponse(context.Background(), vresp)
-	if err != nil {
-		logger.Error(
-			"send vote response",
-			zap.String("error", err.Error()),
-		)
-
-	}
+	c.ReceiveVoteResponse(context.Background(), vresp)
+	return
 
 }
 
