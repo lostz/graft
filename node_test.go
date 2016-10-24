@@ -3,7 +3,6 @@ package graft
 import (
 	"log"
 	"testing"
-	"time"
 )
 
 func TestNewNode(t *testing.T) {
@@ -12,7 +11,6 @@ func TestNewNode(t *testing.T) {
 		log.Println(err.Error())
 		return
 	}
-	log.Println("test")
 	if node.State() == LEADER {
 		log.Println("i am leader")
 	}
@@ -21,9 +19,6 @@ func TestNewNode(t *testing.T) {
 		select {
 		case sc := <-node.StateChg:
 			log.Println(sc)
-		default:
-			log.Println(node.State())
-			time.Sleep(1 * time.Second)
 		}
 	}
 
