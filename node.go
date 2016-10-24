@@ -44,17 +44,17 @@ func (n *Node) broadcastVote() {
 func (n *Node) votePeer(peer string) {
 	conn, err := grpc.Dial(peer, []grpc.DialOption{grpc.WithTimeout(500 * time.Millisecond), grpc.WithInsecure()}...)
 	if err != nil {
-		// perr offline
+		logger.Error(
+			"grpc dial",
+			zap.String("err", err.Error()),
+		)
 		return
 	}
 	defer conn.Close()
 	c := protocol.NewRaftClient(conn)
 	_, err = c.SendVoteRequest(context.Background(), &protocol.VoteRequest{Term: n.term, Candidate: n.id})
 	if err != nil {
-		logger.Error(
-			"send vote requset",
-			zap.String("err", err.Error()),
-		)
+		// peer offline
 	}
 	return
 }
@@ -70,6 +70,10 @@ func (n *Node) broadcastHearbeat() {
 func (n *Node) heartbeatPeer(peer string) {
 	conn, err := grpc.Dial(peer, []grpc.DialOption{grpc.WithTimeout(1000 * time.Millisecond), grpc.WithInsecure()}...)
 	if err != nil {
+		logger.Error(
+			"grpc dial",
+			zap.String("err", err.Error()),
+		)
 		//peer offline
 		return
 	}
@@ -262,7 +266,6 @@ func (n *Node) runAsCandidate() {
 			n.switchToCandidate()
 			return
 		case vresp := <-n.VoteResponse:
-			fmt.Println(vresp)
 			if vresp.Granted && vresp.Term == n.term {
 				votes++
 				if n.wonElection(votes) {
@@ -272,13 +275,11 @@ func (n *Node) runAsCandidate() {
 
 			}
 		case vreq := <-n.VoteRequests:
-			fmt.Println(vreq)
 			if stepDown := n.handleVoteRequest(vreq); stepDown {
 				n.switchToFollower("")
 				return
 			}
 		case hb := <-n.HeartBeats:
-			fmt.Println(hb)
 			if stepDown := n.handleHeartBeat(hb); stepDown {
 				n.switchToFollower(hb.Leader)
 				return
@@ -352,17 +353,17 @@ func (n *Node) SendVoteResponse(context context.Context, vresp *protocol.VoteRes
 func (n *Node) sendVoteResponse(peer string, vresp *protocol.VoteResponse) {
 	conn, err := grpc.Dial(peer, []grpc.DialOption{grpc.WithTimeout(500 * time.Millisecond), grpc.WithInsecure()}...)
 	if err != nil {
-		//peer offline
+		logger.Error(
+			"grpc dial",
+			zap.String("err", err.Error()),
+		)
 		return
 	}
 	defer conn.Close()
 	c := protocol.NewRaftClient(conn)
 	_, err = c.SendVoteResponse(context.Background(), vresp)
 	if err != nil {
-		logger.Error(
-			"send vote response",
-			zap.String("err", err.Error()),
-		)
+		//peer offline
 	}
 	return
 
