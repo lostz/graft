@@ -4,6 +4,15 @@ import (
 	"fmt"
 )
 
+// StateChange captures "from" and "to" States
+type StateChange struct {
+	// From is the previous state.
+	From State
+
+	// To is the new state.
+	To State
+}
+
 //State for a graft node
 type State int8
 
