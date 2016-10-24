@@ -151,6 +151,11 @@ func (n *Node) handleHeartBeat(hb *protocol.HeartbeatRequest) bool {
 	n.resetElectionTimeout()
 	if saveState {
 		if err := n.writeState(); err != nil {
+			logger.Error(
+				"write state",
+				zap.Uint64("term", n.term),
+				zap.String("error", err.Error()),
+			)
 			stepDown = true
 		}
 	}
@@ -184,6 +189,11 @@ func (n *Node) handleVoteRequest(vreq *protocol.VoteRequest) bool {
 	n.setVote(vreq.Candidate)
 	if saveState {
 		if err := n.writeState(); err != nil {
+			logger.Error(
+				"write state",
+				zap.Uint64("term", n.term),
+				zap.String("error", err.Error()),
+			)
 			n.setVote("")
 			n.sendVoteResponse(vreq.Candidate, deny)
 			n.resetElectionTimeout()
@@ -234,6 +244,11 @@ func (n *Node) runAsCandidate() {
 	votes := 1
 	n.setVote(n.id)
 	if err := n.writeState(); err != nil {
+		logger.Error(
+			"write state",
+			zap.Uint64("term", n.term),
+			zap.String("error", err.Error()),
+		)
 		n.switchToFollower("")
 		return
 	}
