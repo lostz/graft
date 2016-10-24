@@ -20,7 +20,6 @@ var logger = zap.New(zap.NewTextEncoder())
 //Node ...
 type Node struct {
 	electTimer   *time.Timer
-	handler      *ChanHandler
 	id           string
 	ip           string
 	leader       string
@@ -30,7 +29,7 @@ type Node struct {
 	quit         chan chan struct{}
 	server       *grpc.Server
 	state        State
-	stateChg     []*StateChange
+	StateChg     chan StateChange
 	term         uint64
 	vote         string
 	VoteRequests chan *protocol.VoteRequest
@@ -220,19 +219,6 @@ func (n *Node) loop() {
 
 }
 
-func (n *Node) postStateChange(sc *StateChange) {
-	go func() {
-		n.handler.StateChange(sc.From, sc.To)
-		n.mu.Lock()
-		n.stateChg = n.stateChg[1:]
-		if len(n.stateChg) > 0 {
-			sc := n.stateChg[0]
-			n.postStateChange(sc)
-		}
-		n.mu.Unlock()
-	}()
-}
-
 func (n *Node) processQuit(q chan struct{}) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
@@ -400,11 +386,8 @@ func (n *Node) switchState(state State) {
 	}
 	old := n.state
 	n.state = state
-	sc := &StateChange{From: old, To: state}
-	n.stateChg = append(n.stateChg, sc)
-	if len(n.stateChg) == 1 {
-		n.postStateChange(sc)
-	}
+	sc := StateChange{From: old, To: state}
+	n.StateChg <- sc
 }
 
 func (n *Node) switchToCandidate() {
@@ -448,13 +431,13 @@ func (n *Node) wonElection(votes int) bool {
 }
 
 //NewNode ....
-func NewNode(handler *ChanHandler, peers []string, ip, logPath string, port int) (*Node, error) {
+func NewNode(peers []string, ip, logPath string, port int) (*Node, error) {
 	n := &Node{
-		ip:      ip,
-		state:   FOLLOWER,
-		peers:   peers,
-		handler: handler,
+		ip:    ip,
+		state: FOLLOWER,
+		peers: peers,
 	}
+	n.StateChg = make(chan StateChange)
 	n.quit = make(chan chan struct{})
 	n.HeartBeats = make(chan *protocol.HeartbeatRequest)
 	n.VoteRequests = make(chan *protocol.VoteRequest)
