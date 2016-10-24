@@ -1,12 +1,10 @@
-hash: 170de618e3c8c48bde813784499da6978e5401d4725f3059993c6008093dad1c
-updated: 2016-10-20T11:26:41.056183429+08:00
+hash: 5f4baa53b445d2c6c031aa89f45a9948a7b029321a0f9ab9f1dbc1a19aeb2951
+updated: 2016-10-24T15:10:10.935613783+08:00
 imports:
 - name: github.com/golang/protobuf
   version: 98fa357170587e470c5f27d3c3ea0947b71eb455
   subpackages:
   - proto
-- name: github.com/Sirupsen/logrus
-  version: 3ec0642a7fb6488f65b06f9040adc67e3990296a
 - name: github.com/uber-go/atomic
   version: 6c2817a9ef3b9315f7d237a652f2ab0dac2aee96
 - name: github.com/uber-go/zap

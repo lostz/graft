@@ -1,8 +1,6 @@
 package graft
 
 import (
-	"bytes"
-	"crypto/sha1"
 	"encoding/json"
 	"io/ioutil"
 	"os"
@@ -13,8 +11,8 @@ type checksum struct {
 }
 
 type persistentState struct {
-	currentTerm uint64
-	votedFor    string
+	CurrentTerm uint64
+	VotedFor    string
 }
 
 func (n *Node) closeLog() error {
@@ -33,8 +31,8 @@ func (n *Node) initLog(path string) error {
 		return err
 	}
 	if ps != nil {
-		n.setTerm(ps.currentTerm)
-		n.setVote(ps.votedFor)
+		n.setTerm(ps.CurrentTerm)
+		n.setVote(ps.VotedFor)
 	}
 	return nil
 
@@ -49,18 +47,8 @@ func (n *Node) readState(path string) (*persistentState, error) {
 		return nil, ErrNoStateLog
 	}
 
-	chs := &checksum{}
-	if err := json.Unmarshal(buf, chs); err != nil {
-		return nil, err
-	}
-
-	sha := sha1.New().Sum(chs.data)
-	if !bytes.Equal(sha, chs.sha) {
-		return nil, ErrLogCorrupt
-	}
-
 	ps := &persistentState{}
-	if err := json.Unmarshal(chs.data, ps); err != nil {
+	if err := json.Unmarshal(buf, ps); err != nil {
 		return nil, err
 	}
 	return ps, nil
@@ -69,8 +57,8 @@ func (n *Node) readState(path string) (*persistentState, error) {
 func (n *Node) writeState() error {
 	n.mu.Lock()
 	ps := persistentState{
-		currentTerm: n.term,
-		votedFor:    n.vote,
+		CurrentTerm: n.term,
+		VotedFor:    n.vote,
 	}
 	logPath := n.logPath
 	n.mu.Unlock()
@@ -79,17 +67,6 @@ func (n *Node) writeState() error {
 		return err
 	}
 
-	// Set a SHA1 to test for corruption on read
-	chs := checksum{
-		sha:  sha1.New().Sum(buf),
-		data: buf,
-	}
-
-	data, err := json.Marshal(chs)
-	if err != nil {
-		return err
-	}
-
-	return ioutil.WriteFile(logPath, data, 0660)
+	return ioutil.WriteFile(logPath, buf, 0660)
 
 }

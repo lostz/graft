@@ -1,12 +1,18 @@
 package graft
 
-import "google.golang.org/grpc/grpclog"
+import (
+	"github.com/uber-go/zap"
+	"google.golang.org/grpc/grpclog"
+)
 
 func init() {
 	grpclog.SetLogger(&Logger{})
 
 }
 
+var logger = zap.New(zap.NewTextEncoder())
+
+// Logger for grpc
 type Logger struct {
 }
 

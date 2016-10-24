@@ -23,8 +23,8 @@ message HeartbeatRequest {
 message Response{}
 
 service raft {
-    rpc ReceiveVoteRequest(VoteRequest) returns (Response){};
-    rpc ReceiveVoteResponse(VoteResponse) returns(Response){};
+    rpc SendVoteRequest(VoteRequest) returns (Response){};
+    rpc SendVoteResponse(VoteResponse) returns(Response){};
     rpc Heartbeat(HeartbeatRequest) returns (Response){};
 }
 

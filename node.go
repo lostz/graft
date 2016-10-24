@@ -15,8 +15,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-var logger = zap.New(zap.NewTextEncoder())
-
 //Node ...
 type Node struct {
 	electTimer   *time.Timer
@@ -55,7 +53,11 @@ func (n *Node) votePeer(peer string) {
 	}
 	defer conn.Close()
 	c := protocol.NewRaftClient(conn)
-	c.ReceiveVoteRequest(context.Background(), &protocol.VoteRequest{Term: n.term, Candidate: n.id})
+	_, err = c.SendVoteRequest(context.Background(), &protocol.VoteRequest{Term: n.term, Candidate: n.id})
+	logger.Error(
+		"send vote requset",
+		zap.String("err", err.Error()),
+	)
 	return
 }
 
@@ -347,8 +349,8 @@ func (n *Node) runAsLeader() {
 
 }
 
-// ReceiveVoteResponse recevie voteresponse
-func (n *Node) ReceiveVoteResponse(context context.Context, vresp *protocol.VoteResponse) (*protocol.Response, error) {
+// SendVoteResponse receive voteresponse
+func (n *Node) SendVoteResponse(context context.Context, vresp *protocol.VoteResponse) (*protocol.Response, error) {
 	n.VoteResponse <- vresp
 	return &protocol.Response{}, nil
 }
@@ -365,7 +367,13 @@ func (n *Node) sendVoteResponse(peer string, vresp *protocol.VoteResponse) {
 	}
 	defer conn.Close()
 	c := protocol.NewRaftClient(conn)
-	c.ReceiveVoteResponse(context.Background(), vresp)
+	_, err = c.SendVoteResponse(context.Background(), vresp)
+	if err != nil {
+		logger.Error(
+			"send vote response",
+			zap.String("err", err.Error()),
+		)
+	}
 	return
 
 }
@@ -429,8 +437,8 @@ func (n *Node) switchToLeader() {
 	n.switchState(LEADER)
 }
 
-//ReceiveVoteRequest grpc
-func (n *Node) ReceiveVoteRequest(context context.Context, vreq *protocol.VoteRequest) (*protocol.Response, error) {
+//SendVoteRequest grpc
+func (n *Node) SendVoteRequest(context context.Context, vreq *protocol.VoteRequest) (*protocol.Response, error) {
 	n.VoteRequests <- vreq
 	return &protocol.Response{}, nil
 }
