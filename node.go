@@ -44,20 +44,18 @@ func (n *Node) broadcastVote() {
 func (n *Node) votePeer(peer string) {
 	conn, err := grpc.Dial(peer, []grpc.DialOption{grpc.WithTimeout(500 * time.Millisecond), grpc.WithInsecure()}...)
 	if err != nil {
-		logger.Error(
-			"grpc dial",
-			zap.String("addr", peer),
-			zap.String("err", err.Error()),
-		)
+		// perr offline
 		return
 	}
 	defer conn.Close()
 	c := protocol.NewRaftClient(conn)
 	_, err = c.SendVoteRequest(context.Background(), &protocol.VoteRequest{Term: n.term, Candidate: n.id})
-	logger.Error(
-		"send vote requset",
-		zap.String("err", err.Error()),
-	)
+	if err != nil {
+		logger.Error(
+			"send vote requset",
+			zap.String("err", err.Error()),
+		)
+	}
 	return
 }
 
@@ -72,11 +70,7 @@ func (n *Node) broadcastHearbeat() {
 func (n *Node) heartbeatPeer(peer string) {
 	conn, err := grpc.Dial(peer, []grpc.DialOption{grpc.WithTimeout(1000 * time.Millisecond), grpc.WithInsecure()}...)
 	if err != nil {
-		logger.Error(
-			"grpc dial",
-			zap.String("addr", peer),
-			zap.String("err", err.Error()),
-		)
+		//peer offline
 		return
 	}
 	defer conn.Close()
@@ -358,11 +352,7 @@ func (n *Node) SendVoteResponse(context context.Context, vresp *protocol.VoteRes
 func (n *Node) sendVoteResponse(peer string, vresp *protocol.VoteResponse) {
 	conn, err := grpc.Dial(peer, []grpc.DialOption{grpc.WithTimeout(500 * time.Millisecond), grpc.WithInsecure()}...)
 	if err != nil {
-		logger.Error(
-			"grpc dial",
-			zap.String("addr", peer),
-			zap.String("err", err.Error()),
-		)
+		//peer offline
 		return
 	}
 	defer conn.Close()
