@@ -20,6 +20,7 @@ type Node struct {
 	electTimer   *time.Timer
 	id           string
 	ip           string
+	port         int
 	leader       string
 	logPath      string
 	mu           sync.Mutex
@@ -41,6 +42,20 @@ func (n *Node) broadcastVote() {
 	}
 }
 
+func (n *Node) addPeer(peer string) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	if peer == n.id {
+		return
+	}
+	for _, p := range n.peers {
+		if p == peer {
+			return
+		}
+	}
+	n.peers = append(n.peers, peer)
+}
+
 func (n *Node) votePeer(peer string) {
 	conn, err := grpc.Dial(peer, []grpc.DialOption{grpc.WithTimeout(500 * time.Millisecond), grpc.WithInsecure()}...)
 	if err != nil {
@@ -52,10 +67,7 @@ func (n *Node) votePeer(peer string) {
 	}
 	defer conn.Close()
 	c := protocol.NewRaftClient(conn)
-	_, err = c.SendVoteRequest(context.Background(), &protocol.VoteRequest{Term: n.term, Candidate: n.id})
-	if err != nil {
-		// peer offline
-	}
+	c.SendVoteRequest(context.Background(), &protocol.VoteRequest{Term: n.term, Candidate: n.id})
 	return
 }
 
@@ -79,7 +91,9 @@ func (n *Node) heartbeatPeer(peer string) {
 	}
 	defer conn.Close()
 	c := protocol.NewRaftClient(conn)
-	c.Heartbeat(context.Background(), &protocol.HeartbeatRequest{Term: n.term, Leader: n.id})
+	peers := n.peers
+	peers = append(n.peers, fmt.Sprintf("%s:%d", n.ip, n.port))
+	c.Heartbeat(context.Background(), &protocol.HeartbeatRequest{Term: n.term, Leader: n.id, Peers: peers})
 
 }
 
@@ -112,6 +126,8 @@ func (n *Node) Heartbeat(context context.Context, requset *protocol.HeartbeatReq
 		n.switchToFollower("")
 	}
 	n.mu.Lock()
+	peers := requset.Peers
+	n.peers = appendPeer(peers, n.ip)
 	n.term = requset.Term
 	n.vote = ""
 	n.mu.Unlock()
@@ -165,6 +181,7 @@ func (n *Node) handleHeartBeat(hb *protocol.HeartbeatRequest) bool {
 
 func (n *Node) handleVoteRequest(vreq *protocol.VoteRequest) bool {
 	deny := &protocol.VoteResponse{Term: n.term, Granted: false}
+	n.addPeer(vreq.Candidate)
 	if vreq.Term < n.term {
 		n.sendVoteResponse(vreq.Candidate, deny)
 		return false
@@ -450,6 +467,7 @@ func NewNode(peers []string, ip, logPath string, port int) (*Node, error) {
 		ip:    ip,
 		state: FOLLOWER,
 		peers: peers,
+		port:  port,
 	}
 	n.StateChg = make(chan StateChange)
 	n.quit = make(chan chan struct{})
@@ -484,4 +502,15 @@ func quorumNeeded(clusterSize int) int {
 func randElectionTimeout() time.Duration {
 	delta := rand.Int63n(int64(500 * time.Millisecond))
 	return (500*time.Millisecond + time.Duration(delta))
+}
+
+func appendPeer(peers []string, peer string) []string {
+	var tmp []string
+	for _, p := range peers {
+		if p == peer {
+			continue
+		}
+		tmp = append(tmp, p)
+	}
+	return tmp
 }
