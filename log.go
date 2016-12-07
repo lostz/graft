@@ -27,7 +27,7 @@ func (n *Node) initLog(path string) error {
 	}
 	n.logPath = path
 	ps, err := n.readState(path)
-	if err != nil || err != ErrLogCorrupt {
+	if err != nil || err != ErrLogNoState {
 		return err
 	}
 	if ps != nil {
@@ -44,7 +44,7 @@ func (n *Node) readState(path string) (*persistentState, error) {
 		return nil, err
 	}
 	if len(buf) <= 0 {
-		return nil, ErrNoStateLog
+		return nil, ErrLogNoState
 	}
 
 	ps := &persistentState{}
