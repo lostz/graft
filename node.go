@@ -481,6 +481,9 @@ func NewNode(peers []string, ip, logPath string, port int) (*Node, error) {
 		return nil, err
 	}
 	n.logPath = logPath
+	if err := n.initLog(n.logPath); err != nil {
+		return nil, err
+	}
 	g := grpc.NewServer()
 	protocol.RegisterRaftServer(g, n)
 	n.server = g
