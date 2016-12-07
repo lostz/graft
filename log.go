@@ -22,12 +22,14 @@ func (n *Node) closeLog() error {
 }
 
 func (n *Node) initLog(path string) error {
-	if _, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0660); err != nil {
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0660)
+	if err != nil {
 		return err
 	}
+	defer file.Close()
 	n.logPath = path
 	ps, err := n.readState(path)
-	if err != nil || err != ErrLogNoState {
+	if err != nil && err != ErrLogNoState {
 		return err
 	}
 	if ps != nil {
