@@ -38,7 +38,7 @@ type Node struct {
 
 func (n *Node) broadcastVote() {
 	for _, peer := range n.peers {
-		go n.votePeer(peer)
+		n.votePeer(peer)
 	}
 }
 
