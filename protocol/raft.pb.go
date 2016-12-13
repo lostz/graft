@@ -46,6 +46,20 @@ func (m *VoteRequest) String() string            { return proto.CompactTextStrin
 func (*VoteRequest) ProtoMessage()               {}
 func (*VoteRequest) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
 
+func (m *VoteRequest) GetTerm() uint64 {
+	if m != nil {
+		return m.Term
+	}
+	return 0
+}
+
+func (m *VoteRequest) GetCandidate() string {
+	if m != nil {
+		return m.Candidate
+	}
+	return ""
+}
+
 type VoteResponse struct {
 	Term    uint64 `protobuf:"varint,1,opt,name=term" json:"term,omitempty"`
 	Granted bool   `protobuf:"varint,2,opt,name=granted" json:"granted,omitempty"`
@@ -55,6 +69,20 @@ func (m *VoteResponse) Reset()                    { *m = VoteResponse{} }
 func (m *VoteResponse) String() string            { return proto.CompactTextString(m) }
 func (*VoteResponse) ProtoMessage()               {}
 func (*VoteResponse) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{1} }
+
+func (m *VoteResponse) GetTerm() uint64 {
+	if m != nil {
+		return m.Term
+	}
+	return 0
+}
+
+func (m *VoteResponse) GetGranted() bool {
+	if m != nil {
+		return m.Granted
+	}
+	return false
+}
 
 type HeartbeatRequest struct {
 	Term   uint64   `protobuf:"varint,1,opt,name=term" json:"term,omitempty"`
@@ -66,6 +94,27 @@ func (m *HeartbeatRequest) Reset()                    { *m = HeartbeatRequest{} 
 func (m *HeartbeatRequest) String() string            { return proto.CompactTextString(m) }
 func (*HeartbeatRequest) ProtoMessage()               {}
 func (*HeartbeatRequest) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{2} }
+
+func (m *HeartbeatRequest) GetTerm() uint64 {
+	if m != nil {
+		return m.Term
+	}
+	return 0
+}
+
+func (m *HeartbeatRequest) GetLeader() string {
+	if m != nil {
+		return m.Leader
+	}
+	return ""
+}
+
+func (m *HeartbeatRequest) GetPeers() []string {
+	if m != nil {
+		return m.Peers
+	}
+	return nil
+}
 
 type Response struct {
 }
@@ -88,7 +137,7 @@ var _ grpc.ClientConn
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
-const _ = grpc.SupportPackageIsVersion3
+const _ = grpc.SupportPackageIsVersion4
 
 // Client API for Raft service
 
@@ -217,7 +266,7 @@ var _Raft_serviceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: fileDescriptor0,
+	Metadata: "raft.proto",
 }
 
 func init() { proto.RegisterFile("raft.proto", fileDescriptor0) }
