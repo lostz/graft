@@ -39,9 +39,7 @@ type Node struct {
 
 func (n *Node) broadcastVote() {
 	for _, peer := range n.peers {
-		log.Println(peer)
 		n.votePeer(peer)
-		log.Println("peer finish")
 	}
 }
 
@@ -60,7 +58,7 @@ func (n *Node) addPeer(peer string) {
 }
 
 func (n *Node) votePeer(peer string) {
-	conn, err := grpc.Dial(peer, []grpc.DialOption{grpc.WithTimeout(100 * time.Millisecond), grpc.WithInsecure()}...)
+	conn, err := grpc.Dial(peer, []grpc.DialOption{grpc.WithTimeout(300 * time.Millisecond), grpc.WithInsecure()}...)
 	if err != nil {
 		logger.Error(
 			"grpc dial",
@@ -68,16 +66,9 @@ func (n *Node) votePeer(peer string) {
 		)
 		return
 	}
-	log.Println("conn")
 	defer conn.Close()
-	log.Println("new1")
 	c := protocol.NewRaftClient(conn)
-	log.Println("new2")
-	_, err = c.SendVoteRequest(context.Background(), &protocol.VoteRequest{Term: n.term, Candidate: n.id})
-	log.Println("SendVoteRequest")
-	if err != nil {
-		log.Println(err.Error())
-	}
+	c.SendVoteRequest(context.Background(), &protocol.VoteRequest{Term: n.term, Candidate: n.id})
 	return
 }
 
@@ -241,10 +232,8 @@ func (n *Node) loop() {
 	for n.isRunning() {
 		switch n.State() {
 		case FOLLOWER:
-			log.Println("run as follow")
 			n.runAsFollower()
 		case CANDIDATE:
-			log.Println(n.peers)
 			log.Println("run as candidate")
 			n.runAsCandidate()
 		case LEADER:
@@ -284,7 +273,6 @@ func (n *Node) runAsCandidate() {
 		return
 	}
 	n.broadcastVote()
-	log.Println("broad finish")
 	for {
 		select {
 		case q := <-n.quit:
