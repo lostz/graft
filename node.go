@@ -2,6 +2,7 @@ package graft
 
 import (
 	"fmt"
+	"log"
 	"math/rand"
 	"net"
 	"sync"
@@ -38,7 +39,9 @@ type Node struct {
 
 func (n *Node) broadcastVote() {
 	for _, peer := range n.peers {
+		log.Println(peer)
 		n.votePeer(peer)
+		log.Println("peer finish")
 	}
 }
 
@@ -57,7 +60,7 @@ func (n *Node) addPeer(peer string) {
 }
 
 func (n *Node) votePeer(peer string) {
-	conn, err := grpc.Dial(peer, []grpc.DialOption{grpc.WithTimeout(500 * time.Millisecond), grpc.WithInsecure()}...)
+	conn, err := grpc.Dial(peer, []grpc.DialOption{grpc.WithTimeout(100 * time.Millisecond), grpc.WithInsecure()}...)
 	if err != nil {
 		logger.Error(
 			"grpc dial",
@@ -65,9 +68,16 @@ func (n *Node) votePeer(peer string) {
 		)
 		return
 	}
+	log.Println("conn")
 	defer conn.Close()
+	log.Println("new1")
 	c := protocol.NewRaftClient(conn)
-	c.SendVoteRequest(context.Background(), &protocol.VoteRequest{Term: n.term, Candidate: n.id})
+	log.Println("new2")
+	_, err = c.SendVoteRequest(context.Background(), &protocol.VoteRequest{Term: n.term, Candidate: n.id})
+	log.Println("SendVoteRequest")
+	if err != nil {
+		log.Println(err.Error())
+	}
 	return
 }
 
@@ -91,9 +101,7 @@ func (n *Node) heartbeatPeer(peer string) {
 	}
 	defer conn.Close()
 	c := protocol.NewRaftClient(conn)
-	peers := n.peers
-	peers = append(n.peers, fmt.Sprintf("%s:%d", n.ip, n.port))
-	c.Heartbeat(context.Background(), &protocol.HeartbeatRequest{Term: n.term, Leader: n.id, Peers: peers})
+	c.Heartbeat(context.Background(), &protocol.HeartbeatRequest{Term: n.term, Leader: n.id})
 
 }
 
@@ -126,8 +134,6 @@ func (n *Node) Heartbeat(context context.Context, requset *protocol.HeartbeatReq
 		n.switchToFollower("")
 	}
 	n.mu.Lock()
-	peers := requset.Peers
-	n.peers = appendPeer(peers, n.ip)
 	n.term = requset.Term
 	n.vote = ""
 	n.mu.Unlock()
@@ -235,10 +241,14 @@ func (n *Node) loop() {
 	for n.isRunning() {
 		switch n.State() {
 		case FOLLOWER:
+			log.Println("run as follow")
 			n.runAsFollower()
 		case CANDIDATE:
+			log.Println(n.peers)
+			log.Println("run as candidate")
 			n.runAsCandidate()
 		case LEADER:
+			log.Println("run as leader")
 			n.runAsLeader()
 		}
 
@@ -274,6 +284,7 @@ func (n *Node) runAsCandidate() {
 		return
 	}
 	n.broadcastVote()
+	log.Println("broad finish")
 	for {
 		select {
 		case q := <-n.quit:
@@ -463,6 +474,7 @@ func (n *Node) wonElection(votes int) bool {
 
 //NewNode ....
 func NewNode(peers []string, ip, logPath string, port int) (*Node, error) {
+	log.Println(peers)
 	n := &Node{
 		ip:    ip,
 		state: FOLLOWER,
