@@ -17,7 +17,6 @@ message VoteResponse  {
 message HeartbeatRequest {
     uint64 term=1;
     string leader=2;
-    repeated string peers=3;
 }
 
 
