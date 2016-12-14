@@ -2,7 +2,6 @@ package graft
 
 import (
 	"fmt"
-	"log"
 	"math/rand"
 	"net"
 	"sync"
@@ -234,10 +233,8 @@ func (n *Node) loop() {
 		case FOLLOWER:
 			n.runAsFollower()
 		case CANDIDATE:
-			log.Println("run as candidate")
 			n.runAsCandidate()
 		case LEADER:
-			log.Println("run as leader")
 			n.runAsLeader()
 		}
 
@@ -462,7 +459,6 @@ func (n *Node) wonElection(votes int) bool {
 
 //NewNode ....
 func NewNode(peers []string, ip, logPath string, port int) (*Node, error) {
-	log.Println(peers)
 	n := &Node{
 		ip:    ip,
 		state: FOLLOWER,
