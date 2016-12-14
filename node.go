@@ -254,6 +254,7 @@ func (n *Node) resetElectionTimeout() {
 }
 
 func (n *Node) runAsCandidate() {
+	n.switchToCandidate()
 	votes := 1
 	n.setVote(n.id)
 	if err := n.writeState(); err != nil {
@@ -331,6 +332,7 @@ func (n *Node) runAsFollower() {
 }
 
 func (n *Node) runAsLeader() {
+	n.switchToLeader()
 	hb := time.NewTicker(100 * time.Millisecond)
 	defer hb.Stop()
 	for {
@@ -422,7 +424,6 @@ func (n *Node) switchToCandidate() {
 	defer n.mu.Unlock()
 	n.term++
 	n.leader = ""
-	n.state = CANDIDATE
 	n.resetElectionTimeout()
 	n.switchState(CANDIDATE)
 
