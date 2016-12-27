@@ -67,7 +67,9 @@ func (n *Node) votePeer(peer string) {
 	}
 	defer conn.Close()
 	c := protocol.NewRaftClient(conn)
-	c.SendVoteRequest(context.Background(), &protocol.VoteRequest{Term: n.term, Candidate: n.id})
+	ctx, cancel := context.WithTimeout(context.Background(), 80*time.Millisecond)
+	defer cancel()
+	c.SendVoteRequest(ctx, &protocol.VoteRequest{Term: n.term, Candidate: n.id})
 	return
 }
 
@@ -91,7 +93,9 @@ func (n *Node) heartbeatPeer(peer string) {
 	}
 	defer conn.Close()
 	c := protocol.NewRaftClient(conn)
-	c.Heartbeat(context.Background(), &protocol.HeartbeatRequest{Term: n.term, Leader: n.id})
+	ctx, cancel := context.WithTimeout(context.Background(), 80*time.Millisecond)
+	defer cancel()
+	c.Heartbeat(ctx, &protocol.HeartbeatRequest{Term: n.term, Leader: n.id})
 
 }
 
@@ -376,10 +380,9 @@ func (n *Node) sendVoteResponse(peer string, vresp *protocol.VoteResponse) {
 	}
 	defer conn.Close()
 	c := protocol.NewRaftClient(conn)
-	_, err = c.SendVoteResponse(context.Background(), vresp)
-	if err != nil {
-		//peer offline
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), 80*time.Millisecond)
+	defer cancel()
+	c.SendVoteResponse(ctx, vresp)
 	return
 
 }
