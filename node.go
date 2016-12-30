@@ -42,20 +42,6 @@ func (n *Node) broadcastVote() {
 	}
 }
 
-func (n *Node) addPeer(peer string) {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-	if peer == n.id {
-		return
-	}
-	for _, p := range n.peers {
-		if p == peer {
-			return
-		}
-	}
-	n.peers = append(n.peers, peer)
-}
-
 func (n *Node) votePeer(peer string) {
 	conn, err := grpc.Dial(peer, []grpc.DialOption{grpc.WithTimeout(300 * time.Millisecond), grpc.WithInsecure()}...)
 	if err != nil {
@@ -120,29 +106,7 @@ func (n *Node) Close() {
 
 //Heartbeat from leader
 func (n *Node) Heartbeat(context context.Context, requset *protocol.HeartbeatRequest) (*protocol.Response, error) {
-	if requset.Term < n.term {
-		return &protocol.Response{}, nil
-	}
-	saveState := false
-	if n.State() == LEADER {
-		n.switchToFollower("")
-	}
-	n.mu.Lock()
-	n.term = requset.Term
-	n.vote = ""
-	n.mu.Unlock()
-	saveState = true
-	n.resetElectionTimeout()
-	if saveState {
-		if err := n.writeState(); err != nil {
-			logger.Error(
-				"write state",
-				zap.Uint64("term", n.term),
-				zap.String("error", err.Error()),
-			)
-		}
-	}
-	n.switchToFollower(requset.Leader)
+	n.HeartBeats <- requset
 	return &protocol.Response{}, nil
 }
 
@@ -181,7 +145,6 @@ func (n *Node) handleHeartBeat(hb *protocol.HeartbeatRequest) bool {
 
 func (n *Node) handleVoteRequest(vreq *protocol.VoteRequest) bool {
 	deny := &protocol.VoteResponse{Term: n.term, Granted: false}
-	n.addPeer(vreq.Candidate)
 	if vreq.Term < n.term {
 		n.sendVoteResponse(vreq.Candidate, deny)
 		return false
