@@ -1,7 +1,6 @@
 package graft
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"math/rand"
@@ -9,16 +8,22 @@ import (
 	"sync"
 	"time"
 
-	"google.golang.org/grpc"
-
 	"github.com/lostz/graft/protocol"
+	"golang.org/x/net/context"
+	"google.golang.org/grpc"
 )
 
 const (
+	// LEADER raft
 	LEADER = iota
+	// CANDIDATE raft
 	CANDIDATE
+	// FLLOWER raft
 	FLLOWER
-	HBINTERVAL = 50 * time.Millisecond // 50ms
+	//CLOSED  closed
+	CLOSED
+	//HBINTERVAL 50 ms
+	HBINTERVAL = 50 * time.Millisecond
 )
 
 // Raft raft peer
@@ -33,6 +38,7 @@ type Raft struct {
 	chanLeader    chan bool
 	currentTerm   uint64
 	votedFor      string
+	server        *grpc.Server
 }
 
 // GetState return currentTerm and whether this peer is leader
@@ -69,8 +75,8 @@ func (rf *Raft) SendVoteRequest(context context.Context, vreqt *protocol.VoteReq
 
 }
 
-// Heartbeat rpc handler
-func (rf *Raft) Heartbeat(context context.Context, hreqt *protocol.HeartbeatRequest) (repe *protocol.Response, err error) {
+// SendHeartbeat rpc handler
+func (rf *Raft) SendHeartbeat(context context.Context, hreqt *protocol.HeartbeatRequest) (repe *protocol.Response, err error) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 	if hreqt.Term < rf.currentTerm {
@@ -88,14 +94,14 @@ func (rf *Raft) Heartbeat(context context.Context, hreqt *protocol.HeartbeatRequ
 }
 
 func (rf *Raft) sendRequestVote(peer string, vreqt *protocol.VoteRequest) bool {
-	conn, err := grpc.Dial(peer, []grpc.DialOption{grpc.WithTimeout(300 * time.Millisecond), grpc.WithInsecure()}...)
+	conn, err := grpc.Dial(peer, []grpc.DialOption{grpc.WithTimeout(30 * time.Millisecond), grpc.WithInsecure()}...)
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 		return false
 	}
 	defer conn.Close()
 	c := protocol.NewRaftClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), 80*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
 	vrepe, err := c.SendVoteRequest(ctx, vreqt)
 	if err != nil {
@@ -127,14 +133,14 @@ func (rf *Raft) sendRequestVote(peer string, vreqt *protocol.VoteRequest) bool {
 }
 
 func (rf *Raft) sendHeartbeat(peer string, hreqt *protocol.HeartbeatRequest) bool {
-	conn, err := grpc.Dial(peer, []grpc.DialOption{grpc.WithTimeout(300 * time.Millisecond), grpc.WithInsecure()}...)
+	conn, err := grpc.Dial(peer, []grpc.DialOption{grpc.WithTimeout(30 * time.Millisecond), grpc.WithInsecure()}...)
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 		return false
 	}
 	defer conn.Close()
 	c := protocol.NewRaftClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), 80*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
 	repe, err := c.SendHeartbeat(ctx, hreqt)
 	if err != nil {
@@ -143,7 +149,6 @@ func (rf *Raft) sendHeartbeat(peer string, hreqt *protocol.HeartbeatRequest) boo
 	}
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
-	term := rf.currentTerm
 	if rf.state != LEADER {
 		return true
 	}
@@ -189,6 +194,9 @@ func (rf *Raft) broadcastHeartbeat() {
 func (rf *Raft) loop() {
 	for {
 		switch rf.state {
+		case CLOSED:
+			log.Println("close raft")
+			return
 		case FLLOWER:
 			select {
 			case <-rf.chanHeartbeat:
@@ -222,6 +230,15 @@ func (rf *Raft) loop() {
 
 }
 
+// Stop ...
+func (rf *Raft) Stop() {
+	rf.mu.Lock()
+	rf.server.GracefulStop()
+	rf.state = CLOSED
+	rf.mu.Unlock()
+}
+
+// New return *Raft
 func New(peers []string, me string, port int) (*Raft, error) {
 	rf := &Raft{}
 	rf.peers = peers

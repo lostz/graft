@@ -1,0 +1,7 @@
+package: github.com/lostz/graft
+import:
+- package: github.com/golang/protobuf
+  subpackages:
+  - proto
+- package: golang.org/x/net/context
+- package: google.golang.org/grpc
