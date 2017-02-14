@@ -20,12 +20,13 @@ message HeartbeatRequest {
 }
 
 
-message Response{}
+message Response{
+    uint64 term=1;
+}
 
 service raft {
-    rpc SendVoteRequest(VoteRequest) returns (Response){};
-    rpc SendVoteResponse(VoteResponse) returns(Response){};
-    rpc Heartbeat(HeartbeatRequest) returns (Response){};
+    rpc SendVoteRequest(VoteRequest) returns (VoteResponse){};
+    rpc SendHeartbeat(HeartbeatRequest) returns (Response){};
 }
 
 
