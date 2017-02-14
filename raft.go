@@ -28,13 +28,15 @@ type Raft struct {
 	peers         []string
 	state         int
 	voteCount     int
+	chanHeartbeat chan bool
 	chanGrantVote chan bool
-	currentTerm   int
+	chanLeader    chan bool
+	currentTerm   uint64
 	votedFor      string
 }
 
 // GetState return currentTerm and whether this peer is leader
-func (rf *Raft) GetState() (int, bool) {
+func (rf *Raft) GetState() (uint64, bool) {
 	return rf.currentTerm, rf.state == LEADER
 }
 
@@ -61,8 +63,9 @@ func (rf *Raft) SendVoteRequest(context context.Context, vreqt *protocol.VoteReq
 		rf.chanGrantVote <- true
 		rf.state = FLLOWER
 		vrepe.Granted = true
-		rf.votedFor = vreqt.CandidateId
+		rf.votedFor = vreqt.Candidate
 	}
+	return
 
 }
 
@@ -79,7 +82,9 @@ func (rf *Raft) Heartbeat(context context.Context, hreqt *protocol.HeartbeatRequ
 		rf.currentTerm = hreqt.Term
 		rf.state = FLLOWER
 		rf.votedFor = ""
+		repe.Term = hreqt.Term
 	}
+	return
 }
 
 func (rf *Raft) sendRequestVote(peer string, vreqt *protocol.VoteRequest) bool {
@@ -156,13 +161,13 @@ func (rf *Raft) sendHeartbeat(peer string, hreqt *protocol.HeartbeatRequest) boo
 
 func (rf *Raft) broadcastRequestVote() {
 	rf.mu.Lock()
-	vreqt := &protocol.VoteRequest{Term: rf.currentTerm, Candidate: rf.id}
+	vreqt := &protocol.VoteRequest{Term: rf.currentTerm, Candidate: rf.me}
 	rf.mu.Unlock()
-	for i := range rf.peers {
-		if i != rf.me && rf.state == CANDIDATE {
-			go func(i string) {
-				rf.sendRequestVote(i, vreqt)
-			}(i)
+	for _, peer := range rf.peers {
+		if peer != rf.me && rf.state == CANDIDATE {
+			go func(peer string) {
+				rf.sendRequestVote(peer, vreqt)
+			}(peer)
 		}
 	}
 }
@@ -170,12 +175,12 @@ func (rf *Raft) broadcastRequestVote() {
 func (rf *Raft) broadcastHeartbeat() {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
-	hreqt := &protocol.HeartbeatRequest{Term: rf.currentTerm, Leader: rf.id}
-	for i := range rf.peers {
-		if i != rf.me && rf.state == LEADER {
-			go func(i string, hreqt *protocol.HeartbeatRequest) {
-				rf.sendHeartbeat(i, hreqt)
-			}(i)
+	hreqt := &protocol.HeartbeatRequest{Term: rf.currentTerm, Leader: rf.me}
+	for _, peer := range rf.peers {
+		if peer != rf.me && rf.state == LEADER {
+			go func(peer string) {
+				rf.sendHeartbeat(peer, hreqt)
+			}(peer)
 		}
 
 	}
