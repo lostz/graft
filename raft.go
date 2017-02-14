@@ -96,7 +96,6 @@ func (rf *Raft) SendHeartbeat(context context.Context, hreqt *protocol.Heartbeat
 func (rf *Raft) sendRequestVote(peer string, vreqt *protocol.VoteRequest) bool {
 	conn, err := grpc.Dial(peer, []grpc.DialOption{grpc.WithTimeout(30 * time.Millisecond), grpc.WithInsecure()}...)
 	if err != nil {
-		log.Fatalf("did not connect: %v", err)
 		return false
 	}
 	defer conn.Close()
@@ -105,7 +104,6 @@ func (rf *Raft) sendRequestVote(peer string, vreqt *protocol.VoteRequest) bool {
 	defer cancel()
 	vrepe, err := c.SendVoteRequest(ctx, vreqt)
 	if err != nil {
-		log.Fatalf("did not VoteRequest: %v", err)
 		return false
 	}
 	rf.mu.Lock()
@@ -135,7 +133,6 @@ func (rf *Raft) sendRequestVote(peer string, vreqt *protocol.VoteRequest) bool {
 func (rf *Raft) sendHeartbeat(peer string, hreqt *protocol.HeartbeatRequest) bool {
 	conn, err := grpc.Dial(peer, []grpc.DialOption{grpc.WithTimeout(30 * time.Millisecond), grpc.WithInsecure()}...)
 	if err != nil {
-		log.Fatalf("did not connect: %v", err)
 		return false
 	}
 	defer conn.Close()
@@ -144,7 +141,6 @@ func (rf *Raft) sendHeartbeat(peer string, hreqt *protocol.HeartbeatRequest) boo
 	defer cancel()
 	repe, err := c.SendHeartbeat(ctx, hreqt)
 	if err != nil {
-		log.Fatalf("did not HeartbeatRequest: %v", err)
 		return false
 	}
 	rf.mu.Lock()
