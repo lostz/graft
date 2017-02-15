@@ -36,6 +36,7 @@ type Raft struct {
 	chanHeartbeat chan bool
 	chanGrantVote chan bool
 	chanLeader    chan bool
+	chanState     chan bool
 	currentTerm   uint64
 	votedFor      string
 	server        *grpc.Server
@@ -64,11 +65,13 @@ func (rf *Raft) SendVoteRequest(context context.Context, vreqt *protocol.VoteReq
 	if vreqt.Term > rf.currentTerm {
 		rf.currentTerm = vreqt.Term
 		rf.state = FLLOWER
+		rf.chanState <- true
 		rf.votedFor = ""
 	}
 	if rf.votedFor == "" || rf.votedFor == vreqt.Candidate {
 		rf.chanGrantVote <- true
 		rf.state = FLLOWER
+		rf.chanState <- true
 		vrepe.Granted = true
 		rf.votedFor = vreqt.Candidate
 	}
@@ -89,6 +92,7 @@ func (rf *Raft) SendHeartbeat(context context.Context, hreqt *protocol.Heartbeat
 	if hreqt.Term > rf.currentTerm {
 		rf.currentTerm = hreqt.Term
 		rf.state = FLLOWER
+		rf.chanState <- true
 		rf.votedFor = ""
 		repe.Term = hreqt.Term
 	}
@@ -120,6 +124,7 @@ func (rf *Raft) sendRequestVote(peer string, vreqt *protocol.VoteRequest) bool {
 	if vrepe.Term > term {
 		rf.currentTerm = term
 		rf.state = FLLOWER
+		rf.chanState <- true
 		rf.votedFor = ""
 	}
 	if vrepe.Granted {
@@ -127,6 +132,7 @@ func (rf *Raft) sendRequestVote(peer string, vreqt *protocol.VoteRequest) bool {
 		if rf.state == CANDIDATE && rf.voteCount > len(rf.peers)/2 {
 			rf.state = FLLOWER
 			rf.chanLeader <- true
+			rf.chanState <- true
 		}
 	}
 	return true
@@ -156,6 +162,7 @@ func (rf *Raft) sendHeartbeat(peer string, hreqt *protocol.HeartbeatRequest) boo
 	if repe.Term > rf.currentTerm {
 		rf.currentTerm = repe.Term
 		rf.state = FLLOWER
+		rf.chanState <- true
 		rf.votedFor = ""
 		return true
 	}
@@ -193,6 +200,7 @@ func (rf *Raft) loop() {
 	for {
 		switch rf.state {
 		case CLOSED:
+			rf.chanState <- true
 			log.Println("close raft")
 			return
 		case FLLOWER:
@@ -201,6 +209,7 @@ func (rf *Raft) loop() {
 			case <-rf.chanGrantVote:
 			case <-time.After(time.Duration(rand.Int63()%333+550) * time.Millisecond):
 				rf.state = CANDIDATE
+				rf.chanState <- true
 			}
 		case LEADER:
 			rf.broadcastHeartbeat()
@@ -216,10 +225,12 @@ func (rf *Raft) loop() {
 			case <-time.After(time.Duration(rand.Int63()%300+510) * time.Millisecond):
 			case <-rf.chanHeartbeat:
 				rf.state = FLLOWER
+				rf.chanState <- true
 			case <-rf.chanLeader:
 				rf.mu.Lock()
 				rf.state = LEADER
 				rf.mu.Unlock()
+				rf.chanState <- true
 			}
 
 		}
@@ -237,7 +248,7 @@ func (rf *Raft) Stop() {
 }
 
 // New return *Raft
-func New(peers []string, me string, port int) (*Raft, error) {
+func New(peers []string, me string, port int, chanState chan bool) (*Raft, error) {
 	rf := &Raft{}
 	rf.peers = peers
 	rf.me = me
@@ -247,6 +258,7 @@ func New(peers []string, me string, port int) (*Raft, error) {
 	rf.chanHeartbeat = make(chan bool, 100)
 	rf.chanGrantVote = make(chan bool, 100)
 	rf.chanLeader = make(chan bool, 100)
+	rf.chanState = chanState
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return nil, err
