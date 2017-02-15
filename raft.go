@@ -55,6 +55,7 @@ func (rf *Raft) IsLeader() bool {
 func (rf *Raft) SendVoteRequest(context context.Context, vreqt *protocol.VoteRequest) (vrepe *protocol.VoteResponse, err error) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
+	vrepe = &protocol.VoteResponse{}
 	vrepe.Granted = false
 	if vreqt.Term < rf.currentTerm {
 		vrepe.Term = rf.currentTerm
@@ -84,6 +85,7 @@ func (rf *Raft) SendHeartbeat(context context.Context, hreqt *protocol.Heartbeat
 		return
 	}
 	rf.chanHeartbeat <- true
+	repe = &protocol.Response{}
 	if hreqt.Term > rf.currentTerm {
 		rf.currentTerm = hreqt.Term
 		rf.state = FLLOWER
