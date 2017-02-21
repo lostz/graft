@@ -43,8 +43,8 @@ type Raft struct {
 }
 
 // GetState return currentTerm and whether this peer is leader
-func (rf *Raft) GetState() (uint64, bool) {
-	return rf.currentTerm, rf.state == LEADER
+func (rf *Raft) GetState() (uint64, bool, int) {
+	return rf.currentTerm, rf.state == LEADER, rf.state
 }
 
 // IsLeader is leader
